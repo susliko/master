@@ -76,9 +76,33 @@
 \date{2022}
 \setlength{\parindent}{2em}
 
-\setlength{\textwidth}{458.69pt}
+\setlength{\textwidth}{483.69pt}
 \begin{document}
 \makeatletter
 \chardef\%=`\%
-\fl{ ( x \.{=} 0 ) \.{\leadsto} ( x \.{>} 3 )}
+\fl{ {\p@mmalgorithm} trafficLight}
+\fl{ {\p@variables}}
+\fl{ moveTo \.{=}\@w{green} ,\,}
+\fl{ red \.{=} {\TRUE} ,\,}
+\fl{ yellow \.{=} {\FALSE} ,\,}
+\fl{ green \.{=} {\FALSE} ,\,}
+\fl{ {\p@begin}}
+\fl{ Action\@s{.5}\textrm{:}\@s{3}}
+\fl{ {\p@either}}
+\fl{ {\p@await} green {\p@semicolon}}
+\fl{ yellow}\al{10}{1}{ \.{:=}}\al{10}{2}{ {\TRUE} {\p@semicolon}}
+\fl{ moveTo}\al{11}{1}{ \.{:=}}\al{11}{2}{\@w{red}}
+\fl{ {\p@or}}
+\fl{ {\p@await} yellow \.{\land} moveTo \.{=}\@w{red} {\p@semicolon}}
+\fl{ red \.{:=} {\TRUE} {\p@semicolon}}
+\fl{ {\p@or}}
+\fl{ {\p@await} yellow \.{\land} moveTo \.{=}\@w{green} {\p@semicolon}}
+\fl{ green \.{:=} {\TRUE} {\p@semicolon}}
+\fl{ {\p@or}}
+\fl{ {\p@await} red {\p@semicolon}}
+\fl{ yellow}\al{20}{1}{ \.{:=}}\al{20}{2}{ {\TRUE} {\p@semicolon}}
+\fl{ moveTo}\al{21}{1}{ \.{:=}}\al{21}{2}{\@w{green}}
+\fl{ {\p@end} {\p@either} {\p@semicolon}}
+\fl{ {\p@goto} Action}\al{23}{2}{ {\p@semicolon}}
+\fl{ {\p@end} {\p@algorithm}}\al{24}{2}{ {\p@semicolon}}
 \end{document}
