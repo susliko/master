@@ -755,23 +755,207 @@
     goto Action;
   end algorithm;
 \end{ppcal}
+\begin{tlatex}
+\@x{\@s{8.2} {\p@mmalgorithm} trafficLight}%
+\@x{\@s{8.2} {\p@variables}}%
+\@x{\@s{16.4} moveTo \.{=}\@w{green} ,\,}%
+\@x{\@s{16.4} red \.{=} {\TRUE} ,\,}%
+\@x{\@s{16.4} yellow \.{=} {\FALSE} ,\,}%
+\@x{\@s{16.4} green \.{=} {\FALSE} ,\,}%
+\@x{\@s{8.2} {\p@begin}}%
+\@x{\@s{16.4} Action\@s{.5}\textrm{:}\@s{3}}%
+\@x{\@s{24.59} {\p@either}}%
+\@x{\@s{32.8} {\p@await} green {\p@semicolon}}%
+\@x{\@s{32.8} yellow\@s{9.17} \.{:=} {\TRUE} {\p@semicolon}}%
+\@x{\@s{32.8} moveTo \.{:=}\@w{red}}%
+\@x{\@s{24.59} {\p@or}}%
+ \@x{\@s{32.8} {\p@await} yellow \.{\land} moveTo \.{=}\@w{red}
+ {\p@semicolon}}%
+\@x{\@s{32.8} red \.{:=} {\TRUE} {\p@semicolon}}%
+\@x{\@s{24.59} {\p@or}}%
+ \@x{\@s{32.8} {\p@await} yellow \.{\land} moveTo \.{=}\@w{green}
+ {\p@semicolon}}%
+\@x{\@s{32.8} green \.{:=} {\TRUE} {\p@semicolon}}%
+\@x{\@s{24.59} {\p@or}}%
+\@x{\@s{32.8} {\p@await} red {\p@semicolon}}%
+\@x{\@s{32.8} yellow\@s{9.17} \.{:=} {\TRUE} {\p@semicolon}}%
+\@x{\@s{32.8} moveTo \.{:=}\@w{green}}%
+\@x{\@s{24.59} {\p@end} {\p@either} {\p@semicolon}}%
+\@x{\@s{16.4} {\p@goto} Action\@s{11.92} {\p@semicolon}}%
+\@x{\@s{8.2} {\p@end} {\p@algorithm} {\p@semicolon}}%
+\end{tlatex}
 
 Теперь спецификация проходит: красный всегда сменяется зеленым и наоборот.
 
-\section{Поддержка}
-foo
+\section{Эксплуатация}
+После того как написана спецификация и бизнес-процесс, наступает этап эксплуатации.
+Формальную спецификацию не стоит воспринимать как одноразовый артефакт. Она является отличным источником документации и маркером слабых мест бизнес-процесса. 
+
+Текущие инструменты не позволяют из спецификации сгенерировать рабочий код на произвольном языке программирования и наоборот: это горячее направление для исследования для всех систем формальной верификации. Чтобы спецификации не устаревали, их необходимо дорабатывать при изменениях бизнес-процесса, как и любую другую документацию. Это одно из ограничений подхода.
+
 \section{Примеры}
-bar
+В данной секции рассмотрим применение разработаного метода на нескольких примерах.
+Целью является демонстрация рассуждений и мыслительного процесса спецификации в зависимости от формата исходной постановки задачи.
 
 \subsection{Денежный перевод}
 
-\subsection{Светофоры}
+\subsection{Перекресток}
+\begin{tla}
+  ---- MODULE crossroads ----
+EXTENDS Sequences, Integers, TLC, FiniteSets, Helpers
+CONSTANTS Cars
+
+DirsSeq == <<"N", "E", "S", "W">>
+IndOf(dir) == Matching(DirsSeq, dir)
+
+Dirs == Range(DirsSeq)
+RightTo[x \in Dirs] == 
+  LET RightInd == (IndOf(x) % 4) + 1
+  IN DirsSeq[RightInd]
+OppTo[x \in Dirs] ==
+  LET OppInd == ((IndOf(x) + 1) % 4) + 1
+  IN DirsSeq[OppInd]
+LeftTo[x \in Dirs] == 
+  LET LeftInd == ((IndOf(x) + 2) % 4) + 1
+  IN DirsSeq[LeftInd] 
+
+MkCar(f, t, s) == [from |-> f, to |-> t, state |-> s]
+Straight(car) == Abs(IndOf(car.from) - IndOf(car.to)) = 2
+Left(car) == Abs(IndOf(car.from) - IndOf(car.to)) = 3
+Reverse(car) == car.from = car.to
+  
+Crashing(car1, car2) == 
+  /\ car1.state = "Passing" 
+  /\ car2.state = "Passing" 
+  /\ \/ car1.to = car2.to  
+     \/ /\ Straight(car1) 
+        /\ \/ car2.from = RightTo[car1.from] 
+           \/ Straight(car2)
+     \/ /\ Left(car1)
+        /\ \/ car2.from = RightTo[car1.from]
+           \/ car2.from = OppTo[car1.from]
+           \/ /\ car2.from = LeftTo[car1.from]
+              /\ Left(car2) \/ Straight(car2)
+     \/ /\ Reverse(car1)     
+\end{tla}
+\begin{tlatex}
+\@x{\@s{8.2}}\moduleLeftDash\@xx{ {\MODULE} crossroads}\moduleRightDash\@xx{}%
+\@x{ {\EXTENDS} Sequences ,\, Integers ,\, TLC ,\, FiniteSets ,\, Helpers}%
+\@x{ {\CONSTANTS} Cars}%
+\@pvspace{8.0pt}%
+ \@x{ DirsSeq \.{\defeq} {\langle}\@w{N} ,\,\@w{E} ,\,\@w{S} ,\,\@w{W}
+ {\rangle}}%
+\@x{ IndOf ( dir ) \.{\defeq} Matching ( DirsSeq ,\, dir )}%
+\@pvspace{8.0pt}%
+\@x{ Dirs \.{\defeq} Range ( DirsSeq )}%
+\@x{ RightTo [ x \.{\in} Dirs ] \.{\defeq}}%
+\@x{\@s{8.2} \.{\LET} RightInd \.{\defeq} ( IndOf ( x ) \.{\%} 4 ) \.{+} 1}%
+\@x{\@s{8.2} \.{\IN} DirsSeq [ RightInd ]}%
+\@x{ OppTo [ x \.{\in} Dirs ] \.{\defeq}}%
+ \@x{\@s{8.2} \.{\LET} OppInd \.{\defeq} ( ( IndOf ( x ) \.{+} 1 ) \.{\%} 4 )
+ \.{+} 1}%
+\@x{\@s{8.2} \.{\IN} DirsSeq [ OppInd ]}%
+\@x{ LeftTo [ x \.{\in} Dirs ] \.{\defeq}}%
+ \@x{\@s{8.2} \.{\LET}\@s{1.59} LeftInd \.{\defeq} ( ( IndOf ( x ) \.{+} 2 )
+ \.{\%} 4 ) \.{+} 1}%
+\@x{\@s{8.2} \.{\IN} DirsSeq [ LeftInd ]}%
+\@pvspace{8.0pt}%
+ \@x{ MkCar ( f ,\, t ,\, s ) \.{\defeq} [ from \.{\mapsto} f ,\, to
+ \.{\mapsto} t ,\, state \.{\mapsto} s ]}%
+ \@x{ Straight ( car ) \.{\defeq} Abs ( IndOf ( car . from ) \.{-} IndOf ( car
+ . to ) ) \.{=} 2}%
+ \@x{ Left ( car ) \.{\defeq} Abs ( IndOf ( car . from ) \.{-} IndOf ( car .
+ to ) ) \.{=} 3}%
+\@x{ Reverse ( car ) \.{\defeq} car . from \.{=} car . to}%
+\@pvspace{8.0pt}%
+\@x{ Crashing ( car1 ,\, car2 ) \.{\defeq}}%
+\@x{\@s{8.2} \.{\land} car1 . state \.{=}\@w{Passing}}%
+\@x{\@s{8.2} \.{\land} car2 . state \.{=}\@w{Passing}}%
+\@x{\@s{8.2} \.{\land} \.{\lor} car1 . to\@s{0.75} \.{=} car2 . to}%
+\@x{\@s{24.19} \.{\lor} \.{\land} Straight ( car1 )}%
+\@x{\@s{40.19} \.{\land} \.{\lor} car2 . from \.{=} RightTo [ car1 . from ]}%
+\@x{\@s{56.19} \.{\lor} Straight ( car2 )}%
+\@x{\@s{24.19} \.{\lor} \.{\land} Left ( car1 )}%
+\@x{\@s{40.19} \.{\land} \.{\lor} car2 . from \.{=} RightTo [ car1 . from ]}%
+\@x{\@s{56.19} \.{\lor} car2 . from \.{=} OppTo [ car1 . from ]}%
+\@x{\@s{56.19} \.{\lor} \.{\land} car2 . from \.{=} LeftTo [ car1 . from ]}%
+\@x{\@s{72.19} \.{\land} Left ( car2 ) \.{\lor} Straight ( car2 )}%
+\@x{\@s{24.19} \.{\lor} \.{\land} Reverse ( car1 )}%
+\end{tlatex}
+\begin{ppcal}
+--algorithm crossroadPass
+variables
+  queue = [d \in Dirs |-> <<>>],
+  wantTo = [d \in Dirs |-> {}],
+  wantFrom = [d \in Dirs |-> {}],
+  passing = [d \in Dirs |-> {}];
+define
+  CanMove(car, from, to) == 
+    LET
+      Candidates == Heads(queue)
+      To(t) == wantTo[t] \intersect Candidates
+      From(f) == wantFrom[f] \intersect Candidates
+      Reversing(d) == To(d) \intersect From(d) 
+      Conflicts(f, t) == ((To(t) \intersect From(RightTo[f])) \ Reversing(t)) \union passing[t]
+      Reversal(f, t) == (f = t) => Cardinality(To(t)) = 1 \* reversing car itself
+    IN
+    car \in Candidates /\
+    Cardinality(Conflicts(from, to)) = 0 /\
+    Reversal(from, to)
+end define;
+
+fair process car \in Cars
+variables
+  from \in Dirs, to \in Dirs, state = "Initial";
+begin
+  Action:
+    either
+      await state = "Initial";
+      state := "Waiting";
+      queue[from] := Append(queue[from], self);
+      wantTo[to] := wantTo[to] \union {self};
+      wantFrom[from] := wantFrom[from] \union {self};
+    or
+      await state = "Waiting";
+      await CanMove(self, from, to);
+      state := "Passing";
+      passing[to] := passing[to] \union {self};
+    or
+      await state = "Passing";
+      state := "Initial";
+      queue[from] := Tail(queue[from]);
+      wantTo[to] := wantTo[to] \ {self};
+      wantFrom[from] := wantFrom[from] \ {self};
+      passing[to] := passing[to] \ {self};
+    end either;
+    goto Action;
+end process;
+end algorithm;
+\end{ppcal}
 
 \section{Анализ применимости}
+Этот раздел завершает рассказ о методике, приводя рассуждения о накладных расходах ее применения, ее достоинствах и ограничениях.
+Все рассуждения выведены эмпирическим путем.
 
-\subsection{Стоимость}
+\subsection{Опыт}
+Был проведен эксперимент: методика была опробована на практике. Нескольким разработчикам было выделено время на изучение \tlapl и интеграцию в повседневную работу. От старта эксперимента до получения первых полезных спецификаций у разных участников ушло от нескольких дней до двух недель. Разработчики отметили простоту концептов, выразительность языка и возможность переиспользования их опыта программирования. 
+
+Наиболее сложным оказалось формулирование темпоральных свойств. В связи с этим был разработан описанный выше набор вопросов, облегчающих обнаружение инвариантов. Также выяснилось, что качество инструментов для \tlapl уступает качеству оных для языков программирования. Это послужило мотивацией для ряда разработок, о которых речь пойдет в последней главе работы.
+
+Полученные спецификации помогли выявить язъяны в исходном дизайне и подсветить хрупкие места системы. Такие места --- естественный кандидат для мониторинга. Плюс мониторинга, выведенного из спецификации в возможности отслеживания свойства, сформулированных на языке, понятном не только разработчикам.
+
+По итогу эксперимента стали ясны достоинства и ограничения методики, опишем их детальнее.
 
 \subsection{Достоинства}
+\begin{itemize}
+  \item Проверщик моделей хорошо находят ошибки, проявляющиеся в конкурентном окружении с неопределенным порядком событий.
+  \item Процесс спецификации выявляет противоречивость в требованиях и возможную недостижимость (или ограниченную достижимость) желаемых свойств.
+  \item Спецификации являются полезным дополнением к документации бизнес-процессов.
+  \item Язык \tlapl построен на простых математических концептах (теория множеств, логика предикатов), знакомых многим разработчикам. Это делает его доступным для изучения в отличии от интерактивных доказателей теорем (таких как Coq, Isabelle, и т.д.).
+  \item Неожиданным стало наблюдение о том, что накопление опыта формальной верификации смещает парадигму мышления и помогает видеть больше ошибок даже до начала применения методики.
+\end{itemize}
+
+
 
 \subsection{Ограничения}
 

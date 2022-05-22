@@ -80,29 +80,63 @@
 \begin{document}
 \makeatletter
 \chardef\%=`\%
-\fl{ {\p@mmalgorithm} trafficLight}
+\fl{ {\p@mmalgorithm} crossroadPass}
 \fl{ {\p@variables}}
-\fl{ moveTo \.{=}\@w{green} ,\,}
-\fl{ red \.{=} {\TRUE} ,\,}
-\fl{ yellow \.{=} {\FALSE} ,\,}
-\fl{ green \.{=} {\FALSE} ,\,}
+\fl{ queue \.{=} [ d \.{\in} Dirs \.{\mapsto} {\langle} {\rangle} ] ,\,}
+\fl{ wantTo \.{=} [ d \.{\in} Dirs \.{\mapsto} \{ \} ] ,\,}
+\fl{ wantFrom \.{=} [ d \.{\in} Dirs \.{\mapsto} \{ \} ] ,\,}
+\fl{ passing \.{=} [ d \.{\in} Dirs \.{\mapsto} \{ \} ] {\p@semicolon}}
+\fl{ {\p@define}}
+\fl{ CanMove ( car ,\, from ,\, to ) \.{\defeq}}
+\fl{ \.{\LET}}
+\fl{ Candidates \.{\defeq} Heads ( queue )}
+\fl{ To ( t ) \.{\defeq} wantTo [ t ] \.{\cap} Candidates}
+\fl{ From ( f ) \.{\defeq} wantFrom [ f ] \.{\cap} Candidates}
+\fl{ Reversing ( d ) \.{\defeq} To ( d ) \.{\cap} From ( d )}
+ \fl{ Conflicts ( f ,\, t ) \.{\defeq} ( ( To ( t ) \.{\cap} From ( RightTo [
+ f ] ) ) \.{\,\backslash\,} Reversing ( t ) ) \.{\cup} passing [ t ]}
+ \fl{ Reversal ( f ,\, t ) \.{\defeq} ( f \.{=} t ) \.{\implies} Cardinality (
+ To ( t ) ) \.{=} 1%
+\@y{%
+  reversing car itself
+}%
+}
+\fl{ \.{\IN}}
+\fl{ car \.{\in} Candidates \.{\land}}
+\fl{ Cardinality ( Conflicts ( from ,\, to ) ) \.{=} 0 \.{\land}}
+\fl{ Reversal ( from ,\, to )}
+\fl{ {\p@end} {\p@define} {\p@semicolon}}
+\fl{}
+\fl{ {\p@fair} {\p@process} car \.{\in} Cars}
+\fl{ {\p@variables}}
+ \fl{ from \.{\in} Dirs ,\, to \.{\in} Dirs ,\, state \.{=}\@w{Initial}
+ {\p@semicolon}}
 \fl{ {\p@begin}}
 \fl{ Action\@s{.5}\textrm{:}\@s{3}}
 \fl{ {\p@either}}
-\fl{ {\p@await} green {\p@semicolon}}
-\fl{ yellow}\al{10}{1}{ \.{:=}}\al{10}{2}{ {\TRUE} {\p@semicolon}}
-\fl{ moveTo}\al{11}{1}{ \.{:=}}\al{11}{2}{\@w{red}}
+\fl{ {\p@await} state \.{=}\@w{Initial} {\p@semicolon}}
+\fl{ state \.{:=}\@w{Waiting} {\p@semicolon}}
+\fl{ queue [ from ] \.{:=} Append ( queue [ from ] ,\, self ) {\p@semicolon}}
+\fl{ wantTo [ to ] \.{:=} wantTo [ to ] \.{\cup} \{ self \} {\p@semicolon}}
+ \fl{ wantFrom [ from ] \.{:=} wantFrom [ from ] \.{\cup} \{ self \}
+ {\p@semicolon}}
 \fl{ {\p@or}}
-\fl{ {\p@await} yellow \.{\land} moveTo \.{=}\@w{red} {\p@semicolon}}
-\fl{ red \.{:=} {\TRUE} {\p@semicolon}}
+\fl{ {\p@await} state \.{=}\@w{Waiting} {\p@semicolon}}
+\fl{ {\p@await} CanMove ( self ,\, from ,\, to ) {\p@semicolon}}
+\fl{ state \.{:=}\@w{Passing} {\p@semicolon}}
+\fl{ passing [ to ] \.{:=} passing [ to ] \.{\cup} \{ self \} {\p@semicolon}}
 \fl{ {\p@or}}
-\fl{ {\p@await} yellow \.{\land} moveTo \.{=}\@w{green} {\p@semicolon}}
-\fl{ green \.{:=} {\TRUE} {\p@semicolon}}
-\fl{ {\p@or}}
-\fl{ {\p@await} red {\p@semicolon}}
-\fl{ yellow}\al{20}{1}{ \.{:=}}\al{20}{2}{ {\TRUE} {\p@semicolon}}
-\fl{ moveTo}\al{21}{1}{ \.{:=}}\al{21}{2}{\@w{green}}
+\fl{ {\p@await} state \.{=}\@w{Passing} {\p@semicolon}}
+\fl{ state \.{:=}\@w{Initial} {\p@semicolon}}
+\fl{ queue [ from ] \.{:=} Tail ( queue [ from ] ) {\p@semicolon}}
+ \fl{ wantTo [ to ] \.{:=} wantTo [ to ] \.{\,\backslash\,} \{ self \}
+ {\p@semicolon}}
+ \fl{ wantFrom [ from ] \.{:=} wantFrom [ from ] \.{\,\backslash\,} \{ self \}
+ {\p@semicolon}}
+ \fl{ passing [ to ] \.{:=} passing [ to ] \.{\,\backslash\,} \{ self \}
+ {\p@semicolon}}
 \fl{ {\p@end} {\p@either} {\p@semicolon}}
-\fl{ {\p@goto} Action}\al{23}{2}{ {\p@semicolon}}
-\fl{ {\p@end} {\p@algorithm}}\al{24}{2}{ {\p@semicolon}}
+\fl{ {\p@goto} Action {\p@semicolon}}
+\fl{ {\p@end} {\p@process} {\p@semicolon}}
+\fl{ {\p@end} {\p@algorithm} {\p@semicolon}}
 \end{document}
