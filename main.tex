@@ -808,9 +808,331 @@
 
 При пересечении перекрестка у машин есть 4 возможных направления движения: поехать прямо, повернуть налево, повернуть направо, развернуться. Для удобства обозначим ответвления дороги как \emph{N, E, S, W}. Сначала смоделируем сам перекресток без каких-либо правил проезда. Интуиция подсказывает, что состояния машины на перекрестке (подъезжает к нему, стоит перед его началом, едет по нему) можно попробовать смоделировать в виде автомата. Для этого воспользуемся нашим шаблоном:
 
-\begin{ppcal}
-\end{ppcal}
+\begin{tla}
+---- MODULE crossroads ----
+EXTENDS Sequences, Integers, TLC, FiniteSets, Helpers
+CONSTANTS Cars
 
+DirsSeq == <<"N", "E", "S", "W">>
+Dirs == Range(DirsSeq)
+\end{tla}
+\begin{tlatex}
+\@x{}\moduleLeftDash\@xx{ {\MODULE} crossroads}\moduleRightDash\@xx{}%
+\@x{ {\EXTENDS} Sequences ,\, Integers ,\, TLC ,\, FiniteSets ,\, Helpers}%
+\@x{ {\CONSTANTS} Cars}%
+\@pvspace{8.0pt}%
+ \@x{ DirsSeq \.{\defeq} {\langle}\@w{N} ,\,\@w{E} ,\,\@w{S} ,\,\@w{W}
+ {\rangle}}%
+\@x{ Dirs \.{\defeq} Range ( DirsSeq )}%
+\end{tlatex}
+\begin{ppcal}
+--algorithm crossroadPass
+variables
+  queue = [d \in Dirs |-> <<>>],
+
+fair process car \in Cars
+variables
+  from \in Dirs, to \in Dirs, state = "Initial";
+begin
+  Action:
+    either
+      await state = "Initial";
+      state := "Waiting";
+      queue[from] := Append(queue[from], self);
+    or
+      await state = "Waiting";
+      state := "Passing";
+    or
+      await state = "Passing";
+      state := "Initial";
+      queue[from] := Tail(queue[from]);
+    end either;
+    goto Action;
+end process;
+
+end algorithm;
+\end{ppcal}
+\begin{tlatex}
+\@x{ {\p@mmalgorithm} crossroadPass}%
+\@x{ {\p@variables}}%
+ \@x{\@s{8.2} queue \.{=} [ d \.{\in} Dirs \.{\mapsto} {\langle} {\rangle} ]
+ ,\,}%
+\@pvspace{8.0pt}%
+\@x{ {\p@fair} {\p@process} car \.{\in} Cars}%
+\@x{ {\p@variables}}%
+ \@x{\@s{8.2} from \.{\in} Dirs ,\, to \.{\in} Dirs ,\, state
+ \.{=}\@w{Initial} {\p@semicolon}}%
+\@x{ {\p@begin}}%
+\@x{\@s{8.2} Action\@s{.5}\textrm{:}\@s{3}}%
+\@x{\@s{16.4} {\p@either}}%
+\@x{\@s{24.59} {\p@await} state \.{=}\@w{Initial} {\p@semicolon}}%
+\@x{\@s{24.59} state \.{:=}\@w{Waiting} {\p@semicolon}}%
+ \@x{\@s{24.59} queue [ from ] \.{:=} Append ( queue [ from ] ,\, self )
+ {\p@semicolon}}%
+\@x{\@s{16.4} {\p@or}}%
+\@x{\@s{24.59} {\p@await} state \.{=}\@w{Waiting} {\p@semicolon}}%
+\@x{\@s{24.59} state \.{:=}\@w{Passing} {\p@semicolon}}%
+\@x{\@s{16.4} {\p@or}}%
+\@x{\@s{24.59} {\p@await} state \.{=}\@w{Passing} {\p@semicolon}}%
+\@x{\@s{24.59} state \.{:=}\@w{Initial} {\p@semicolon}}%
+\@x{\@s{24.59} queue [ from ] \.{:=} Tail ( queue [ from ] ) {\p@semicolon}}%
+\@x{\@s{16.4} {\p@end} {\p@either} {\p@semicolon}}%
+\@x{\@s{16.4} {\p@goto} Action {\p@semicolon}}%
+\@x{ {\p@end} {\p@process} {\p@semicolon}}%
+\@pvspace{8.0pt}%
+\@x{ {\p@end} {\p@algorithm} {\p@semicolon}}%
+\end{tlatex}
+
+Направления движения моделируем и как множество \emph{Dirs}, и как последовательность \emph{DirsSeq}. В то время как множество полезно для ветвления алгоритма по всем направлениям, последовательность поможет устанавливать относительность направлений (например ``Проезд из S в E --- поворт направо``).
+
+Подъезжая к перекрестку, машина становится в очередь \emph{queue} на проезд. Чтобы смоделировать непрерывный поток машин по некоторому направлению, после окончания алгоритма делаем \emph{goto} в начальное состояние. Ключевое слово \emph{fair} перед \emph{process} подразумевает, что машины не перестанут двигаться по алгоритму, пока будут доступные шаги.
+
+Пора определить, что такое безопасный перекресток. Будем считать, что перекресток безопасен, если для любой пары машин верно: когда они переезжают перекресток одновременно, их пути не пересекаются, то есть они не могут столкнуться. Рассмотрение всех возможных вариантов столкновения мы пока отложим и остановимся на простом подможестве: машины могут столкнуться, если они едут в одну и ту же полосу.
+
+\begin{tla}
+  MkCar(f, t, s) == [from |-> f, to |-> t, state |-> s]
+
+  Crashing(car1, car2) == 
+    /\ car1.state = "Passing" 
+    /\ car2.state = "Passing" 
+    /\ car1.to = car2.to  
+
+  NoCrash == 
+    \A c1, c2 \in Cars:
+    (c1 /= c2) => ~Crashing(
+      MkCar(from[c1], to[c1], state[c1]), 
+      MkCar(from[c2], to[c2], state[c2])
+    )
+\end{tla}
+\begin{tlatex}
+ \@x{\@s{8.2} MkCar ( f ,\, t ,\, s ) \.{\defeq} [ from \.{\mapsto} f ,\, to
+ \.{\mapsto} t ,\, state \.{\mapsto} s ]}%
+\@pvspace{8.0pt}%
+\@x{\@s{8.2} Crashing ( car1 ,\, car2 ) \.{\defeq}}%
+\@x{\@s{16.4} \.{\land} car1 . state \.{=}\@w{Passing}}%
+\@x{\@s{16.4} \.{\land} car2 . state \.{=}\@w{Passing}}%
+\@x{\@s{16.4} \.{\land} car1 . to \.{=} car2 . to}%
+\@pvspace{8.0pt}%
+\@x{\@s{8.2} NoCrash \.{\defeq}}%
+\@x{\@s{16.4} \A\, c1 ,\, c2 \.{\in} Cars \.{:}}%
+\@x{\@s{16.4} ( c1 \.{\neq} c2 ) \.{\implies} {\lnot} Crashing (}%
+\@x{\@s{25.98} MkCar ( from [ c1 ] ,\, to [ c1 ] ,\, state [ c1 ] ) ,\,}%
+\@x{\@s{25.98} MkCar ( from [ c2 ] ,\, to [ c2 ] ,\, state [ c2 ] )}%
+\@x{\@s{16.4} )}%
+\end{tlatex}
+
+Пока будем запускать модель для двух потоков машин \emph{c1} и \emph{c2}.
+Просим проверщик моделей запуститься с инвариантом \emph{NoCrash} и закономерно получаем историю, которая ему противоречит: к примеру, движения \(S \rightarrow N\) и \(W \rightarrow E\) могут привести к столкновению.
+
+Перед выездом на перекресток добавим проверку \emph{CanMove}, которая реализует известное ``правило правой руки``: нужно уступать дорогу тем, кто справа от нас и чья траектория пересекается с нашей.
+
+\begin{ppcal}
+algorithm crossroadPass
+variables
+  queue = [d \in Dirs |-> <<>>],
+  wantTo = [d \in Dirs |-> {}],
+  wantFrom = [d \in Dirs |-> {}],
+  passing = [d \in Dirs |-> {}];
+define
+  CanMove(car, from, to) == 
+    LET
+      Candidates == Heads(queue)
+      To(t) == wantTo[t] \intersect Candidates
+      From(f) == wantFrom[f] \intersect Candidates
+      Reversing(d) == To(d) \intersect From(d) 
+      Conflicts(f, t) == ((To(t) \intersect From(RightTo[f])) \ Reversing(t)) \union passing[t]
+      Reversal(f, t) == (f = t) => Cardinality(To(t)) = 1 \* reversing car itself
+    IN
+    car \in Candidates /\
+    Cardinality(Conflicts(from, to)) = 0 /\
+    Reversal(from, to)
+end define;
+
+fair process car \in Cars
+variables
+  from \in Dirs, to \in Dirs, state = "Initial";
+begin
+  Action:
+    either
+      await state = "Initial";
+      state := "Waiting";
+      queue[from] := Append(queue[from], self);
+      wantTo[to] := wantTo[to] \union {self};
+      wantFrom[from] := wantFrom[from] \union {self};
+    or
+      await state = "Waiting";
+      await CanMove(self, from, to);
+      state := "Passing";
+      passing[to] := passing[to] \union {self};
+    or
+      await state = "Passing";
+      state := "Initial";
+      queue[from] := Tail(queue[from]);
+      wantTo[to] := wantTo[to] \ {self};
+      wantFrom[from] := wantFrom[from] \ {self};
+      passing[to] := passing[to] \ {self};
+    end either;
+    goto Action;
+end process;
+
+end algorithm;
+\end{ppcal}
+\begin{tlatex}
+\@x{ {\p@algorithm} crossroadPass}%
+\@x{ {\p@variables}}%
+ \@x{\@s{8.2} queue \.{=} [ d \.{\in} Dirs \.{\mapsto} {\langle} {\rangle} ]
+ ,\,}%
+\@x{\@s{8.2} wantTo \.{=} [ d \.{\in} Dirs \.{\mapsto} \{ \} ] ,\,}%
+\@x{\@s{8.2} wantFrom \.{=} [ d \.{\in} Dirs \.{\mapsto} \{ \} ] ,\,}%
+ \@x{\@s{8.2} passing \.{=} [ d \.{\in} Dirs \.{\mapsto} \{ \} ]
+ {\p@semicolon}}%
+\@x{ {\p@define}}%
+\@x{\@s{8.2} CanMove ( car ,\, from ,\, to ) \.{\defeq}}%
+\@x{\@s{16.4} \.{\LET}}%
+\@x{\@s{24.59} Candidates \.{\defeq} Heads ( queue )}%
+\@x{\@s{24.59} To ( t ) \.{\defeq} wantTo [ t ] \.{\cap} Candidates}%
+\@x{\@s{24.59} From ( f ) \.{\defeq} wantFrom [ f ] \.{\cap} Candidates}%
+\@x{\@s{24.59} Reversing ( d ) \.{\defeq} To ( d ) \.{\cap} From ( d )}%
+ \@x{\@s{24.59} Conflicts ( f ,\, t ) \.{\defeq} ( ( To ( t ) \.{\cap} From (
+ RightTo [ f ] ) ) \.{\,\backslash\,} Reversing ( t ) ) \.{\cup} passing [ t
+ ]}%
+ \@x{\@s{24.59} Reversal ( f ,\, t ) \.{\defeq} ( f \.{=} t ) \.{\implies}
+ Cardinality ( To ( t ) ) \.{=} 1}%
+\@y{%
+  reversing car itself
+}%
+\@xx{}%
+\@x{\@s{16.4} \.{\IN}}%
+\@x{\@s{16.4} car \.{\in} Candidates \.{\land}}%
+\@x{\@s{16.4} Cardinality ( Conflicts ( from ,\, to ) ) \.{=} 0 \.{\land}}%
+\@x{\@s{16.4} Reversal ( from ,\, to )}%
+\@x{ {\p@end} {\p@define} {\p@semicolon}}%
+\@pvspace{8.0pt}%
+\@x{ {\p@fair} {\p@process} car \.{\in} Cars}%
+\@x{ {\p@variables}}%
+ \@x{\@s{8.2} from \.{\in} Dirs ,\, to \.{\in} Dirs ,\, state
+ \.{=}\@w{Initial} {\p@semicolon}}%
+\@x{ {\p@begin}}%
+\@x{\@s{8.2} Action\@s{.5}\textrm{:}\@s{3}}%
+\@x{\@s{16.4} {\p@either}}%
+\@x{\@s{24.59} {\p@await} state \.{=}\@w{Initial} {\p@semicolon}}%
+\@x{\@s{24.59} state \.{:=}\@w{Waiting} {\p@semicolon}}%
+ \@x{\@s{24.59} queue [ from ] \.{:=} Append ( queue [ from ] ,\, self )
+ {\p@semicolon}}%
+ \@x{\@s{24.59} wantTo [ to ] \.{:=} wantTo [ to ] \.{\cup} \{ self \}
+ {\p@semicolon}}%
+ \@x{\@s{24.59} wantFrom [ from ] \.{:=} wantFrom [ from ] \.{\cup} \{ self \}
+ {\p@semicolon}}%
+\@x{\@s{16.4} {\p@or}}%
+\@x{\@s{24.59} {\p@await} state \.{=}\@w{Waiting} {\p@semicolon}}%
+\@x{\@s{24.59} {\p@await} CanMove ( self ,\, from ,\, to ) {\p@semicolon}}%
+\@x{\@s{24.59} state \.{:=}\@w{Passing} {\p@semicolon}}%
+ \@x{\@s{24.59} passing [ to ] \.{:=} passing [ to ] \.{\cup} \{ self \}
+ {\p@semicolon}}%
+\@x{\@s{16.4} {\p@or}}%
+\@x{\@s{24.59} {\p@await} state \.{=}\@w{Passing} {\p@semicolon}}%
+\@x{\@s{24.59} state \.{:=}\@w{Initial} {\p@semicolon}}%
+\@x{\@s{24.59} queue [ from ] \.{:=} Tail ( queue [ from ] ) {\p@semicolon}}%
+ \@x{\@s{24.59} wantTo [ to ] \.{:=} wantTo [ to ] \.{\,\backslash\,} \{ self
+ \} {\p@semicolon}}%
+ \@x{\@s{24.59} wantFrom [ from ] \.{:=} wantFrom [ from ] \.{\,\backslash\,}
+ \{ self \} {\p@semicolon}}%
+ \@x{\@s{24.59} passing [ to ] \.{:=} passing [ to ] \.{\,\backslash\,} \{
+ self \} {\p@semicolon}}%
+\@x{\@s{16.4} {\p@end} {\p@either} {\p@semicolon}}%
+\@x{\@s{16.4} {\p@goto} Action {\p@semicolon}}%
+\@x{ {\p@end} {\p@process} {\p@semicolon}}%
+\@pvspace{8.0pt}%
+\@x{ {\p@end} {\p@algorithm} {\p@semicolon}}%
+\end{tlatex}
+
+Такая спецификация удовлетворяет инварианту \emph{NoCrash}! Помимо безопасности естественным свойством перекрестка видится гарантия того, что каждая машина рано или поздно проедет, куда ей нужно. Сформулируем это свойство с помощью темпорального оператора ``когда-нибудь``(\(\Diamond\)).
+
+\begin{tla}
+EveryonePasses ==
+  \A c \in Cars: <>(state[c] = "Passing")
+\end{tla}
+\begin{tlatex}
+\@x{ EveryonePasses \.{\defeq}}%
+ \@x{\@s{8.2} \A\, c \.{\in} Cars \.{:} {\Diamond} ( state [ c ]
+ \.{=}\@w{Passing} )}%
+\end{tlatex}
+
+Ошибка! Запуск проверки обнаружил историю, в которой машина может бесконечно долго стоять в ожидании своей очереди (Пусть \(c1: S \rightarrow S\) и \(c2: N \rightarrow S\). Если поток машин \emph{c2} непрерывен, машина \emph{c1} будет обречена на вечное ожидание возможности разворота). Очевидно, в реальной жизни не может существовать бесконечного потока машин, однако полученный результат свидетельствует о ситуации на дороге, которую стоит учитывать при проектировании развязок.
+ 
+Вернемся к нашему упрощенному определению столкновения машин и расширим его до всех возможных ситуаций:
+
+\begin{tla}
+IndOf(dir) == Matching(DirsSeq, dir)
+
+RightTo[x \in Dirs] == 
+  LET RightInd == (IndOf(x) % 4) + 1
+  IN DirsSeq[RightInd]
+OppTo[x \in Dirs] ==
+  LET OppInd == ((IndOf(x) + 1) % 4) + 1
+  IN DirsSeq[OppInd]
+LeftTo[x \in Dirs] == 
+  LET LeftInd == ((IndOf(x) + 2) % 4) + 1
+  IN DirsSeq[LeftInd] 
+
+MkCar(f, t, s) == [from |-> f, to |-> t, state |-> s]
+Straight(car) == Abs(IndOf(car.from) - IndOf(car.to)) = 2
+Left(car) == Abs(IndOf(car.from) - IndOf(car.to)) = 3
+Reverse(car) == car.from = car.to
+  
+Crashing(car1, car2) == 
+  /\ car1.state = "Passing" 
+  /\ car2.state = "Passing" 
+  /\ \/ car1.to = car2.to  
+     \/ /\ Straight(car1) 
+        /\ \/ car2.from = RightTo[car1.from] 
+           \/ Straight(car2)
+     \/ /\ Left(car1)
+        /\ \/ car2.from = RightTo[car1.from]
+           \/ car2.from = OppTo[car1.from]
+           \/ /\ car2.from = LeftTo[car1.from]
+              /\ Left(car2) \/ Straight(car2)
+     \/ /\ Reverse(car1)
+\end{tla}
+\begin{tlatex}
+\@x{ IndOf ( dir ) \.{\defeq} Matching ( DirsSeq ,\, dir )}%
+\@pvspace{8.0pt}%
+\@x{ RightTo [ x \.{\in} Dirs ] \.{\defeq}}%
+\@x{\@s{8.2} \.{\LET} RightInd \.{\defeq} ( IndOf ( x ) \.{\%} 4 ) \.{+} 1}%
+\@x{\@s{8.2} \.{\IN} DirsSeq [ RightInd ]}%
+\@x{ OppTo [ x \.{\in} Dirs ] \.{\defeq}}%
+ \@x{\@s{8.2} \.{\LET} OppInd \.{\defeq} ( ( IndOf ( x ) \.{+} 1 ) \.{\%} 4 )
+ \.{+} 1}%
+\@x{\@s{8.2} \.{\IN} DirsSeq [ OppInd ]}%
+\@x{ LeftTo [ x \.{\in} Dirs ] \.{\defeq}}%
+ \@x{\@s{8.2} \.{\LET}\@s{1.59} LeftInd \.{\defeq} ( ( IndOf ( x ) \.{+} 2 )
+ \.{\%} 4 ) \.{+} 1}%
+\@x{\@s{8.2} \.{\IN} DirsSeq [ LeftInd ]}%
+\@pvspace{8.0pt}%
+ \@x{ MkCar ( f ,\, t ,\, s ) \.{\defeq} [ from \.{\mapsto} f ,\, to
+ \.{\mapsto} t ,\, state \.{\mapsto} s ]}%
+ \@x{ Straight ( car ) \.{\defeq} Abs ( IndOf ( car . from ) \.{-} IndOf ( car
+ . to ) ) \.{=} 2}%
+ \@x{ Left ( car ) \.{\defeq} Abs ( IndOf ( car . from ) \.{-} IndOf ( car .
+ to ) ) \.{=} 3}%
+\@x{ Reverse ( car ) \.{\defeq} car . from \.{=} car . to}%
+\@pvspace{8.0pt}%
+\@x{ Crashing ( car1 ,\, car2 ) \.{\defeq}}%
+\@x{\@s{8.2} \.{\land} car1 . state \.{=}\@w{Passing}}%
+\@x{\@s{8.2} \.{\land} car2 . state \.{=}\@w{Passing}}%
+\@x{\@s{8.2} \.{\land} \.{\lor} car1 . to\@s{0.75} \.{=} car2 . to}%
+\@x{\@s{24.19} \.{\lor} \.{\land} Straight ( car1 )}%
+\@x{\@s{40.19} \.{\land} \.{\lor} car2 . from \.{=} RightTo [ car1 . from ]}%
+\@x{\@s{56.19} \.{\lor} Straight ( car2 )}%
+\@x{\@s{24.19} \.{\lor} \.{\land} Left ( car1 )}%
+\@x{\@s{40.19} \.{\land} \.{\lor} car2 . from \.{=} RightTo [ car1 . from ]}%
+\@x{\@s{56.19} \.{\lor} car2 . from \.{=} OppTo [ car1 . from ]}%
+\@x{\@s{56.19} \.{\lor} \.{\land} car2 . from \.{=} LeftTo [ car1 . from ]}%
+\@x{\@s{72.19} \.{\land} Left ( car2 ) \.{\lor} Straight ( car2 )}%
+\@x{\@s{24.19} \.{\lor} \.{\land} Reverse ( car1 )}%
+\end{tlatex}
+
+Обновленное условие столкновения дает интересные результат: правило правой руки не помогает в разрешении ситуации \(c1: S \rightarrow S, c2: N \rightarrow N \), то есть когда две машины едут навстречу друг другу и обе хотят развернуться. 
 
 Итоговая спецификация:
 \begin{tla}
@@ -1012,6 +1334,19 @@ end algorithm;
 \@x{ {\p@end} {\p@process} {\p@semicolon}}%
 \@x{ {\p@end} {\p@algorithm} {\p@semicolon}}%
 \end{tlatex}
+
+Еще один интересный результат --- обнаружение дедлока в ситуации, когда с разных сторон к перекрестку подъезжают сразу 4 машины с пересекающимися направлениями движения.
+
+В этом примере мы начали со спецификации в одно предложение и пришли к необходимости правил по проезду перекрестка. Замоделировав ``правило правой руки``, выяснили часть его фундаментальных проблем:
+\begin{itemize}
+  \item При неудачном стечении обстоятельств машины могут никогда не проехать перекресток.
+  \item Порядок проезда не определен для встречных разворачивающихся машин. 
+  \item Порядок проезда не определен для 4 машин на разных концах перекрестка.
+\end{itemize}
+
+Хоть по отдельности такие ситуации могут происходить редко, каждая из них может провоцировать аварийную ситуацию. Поэтому полезно знать о подобных ограничениях при проектировании городских улиц.
+
+\subsection{Запрос цены}
 
 \section{Анализ применимости}
 Этот раздел завершает рассказ о методике, приводя рассуждения о накладных расходах ее применения, ее достоинствах и ограничениях.

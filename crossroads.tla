@@ -3,9 +3,10 @@ EXTENDS Sequences, Integers, TLC, FiniteSets, Helpers
 CONSTANTS Cars
 
 DirsSeq == <<"N", "E", "S", "W">>
+Dirs == Range(DirsSeq)
+
 IndOf(dir) == Matching(DirsSeq, dir)
 
-Dirs == Range(DirsSeq)
 RightTo[x \in Dirs] == 
   LET RightInd == (IndOf(x) % 4) + 1
   IN DirsSeq[RightInd]

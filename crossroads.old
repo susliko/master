@@ -25,6 +25,7 @@ Crashing(car1, car2) ==
   /\ car1.state = "Passing" 
   /\ car2.state = "Passing" 
   /\ \/ car1.to = car2.to  
+     (*
      \/ /\ Straight(car1) 
         /\ \/ car2.from = RightTo[car1.from] 
            \/ Straight(car2)
@@ -34,9 +35,8 @@ Crashing(car1, car2) ==
            \/ /\ car2.from = LeftTo[car1.from]
               /\ Left(car2) \/ Straight(car2)
      \/ /\ Reverse(car1)
+     *)
              
-   
-
 (*--algorithm crossroadPass
 variables
   queue = [d \in Dirs |-> <<>>],
@@ -50,12 +50,12 @@ define
       To(t) == wantTo[t] \intersect Candidates
       From(f) == wantFrom[f] \intersect Candidates
       Reversing(d) == To(d) \intersect From(d) 
-      Conflicts(f, t) == ((To(t) \intersect From(RightTo[f])) \ Reversing(t)) \union passing[t]
-      Reversal(f, t) == (f = t) => Cardinality(To(t)) = 1 \* reversing car itself
+      Conflicts(f, t) == (To(t) \intersect From(RightTo[f])) 
+      Reversal(f, t) == (f = t) => Cardinality(To(t)) = 1 
     IN
     car \in Candidates /\
-    Cardinality(Conflicts(from, to)) = 0 /\
-    Reversal(from, to)
+    Cardinality(Conflicts(from, to)) = 0 \* /\
+    \* Reversal(from, to)
 end define;
 
 fair process car \in Cars
@@ -87,7 +87,7 @@ end process;
 
 end algorithm;
 *)
-\* BEGIN TRANSLATION (chksum(pcal) = "3425e6a1" /\ chksum(tla) = "65466f39")
+\* BEGIN TRANSLATION (chksum(pcal) = "ba87cd03" /\ chksum(tla) = "96aa1806")
 VARIABLES queue, wantTo, wantFrom, passing, pc
 
 (* define statement *)
@@ -101,8 +101,7 @@ CanMove(car, from, to) ==
     Reversal(f, t) == (f = t) => Cardinality(To(t)) = 1
   IN
   car \in Candidates /\
-  Cardinality(Conflicts(from, to)) = 0 /\
-  Reversal(from, to)
+  Cardinality(Conflicts(from, to)) = 0
 
 VARIABLES from, to, state
 
