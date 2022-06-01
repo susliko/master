@@ -1,5 +1,5 @@
 \batchmode
-\documentclass[14pt, openany]{book}
+\documentclass[14pt, openany]{report}
 \pagestyle{plain}
 \usepackage{setspace}
 \usepackage{enumitem}
@@ -21,6 +21,7 @@
 \usepackage{xcolor}
 \usepackage{hyperref}
 \usepackage{tlatex}
+\usepackage{url}
 \hypersetup{
     colorlinks,
     citecolor=black,
@@ -61,13 +62,15 @@
   
 \geometry{
     a4paper,
-    left=20mm,
+    left=30mm,
     top=20mm,
     right=20mm,
     bottom=20mm
 }
 \setlist[itemize]{noitemsep, topsep=0pt}
 \setstretch{1.5}
+\newcounter{appendix}
+\renewcommand{\theappendix}{\Alph{appendix}}
 
 \newcommand{\tlapl}{TLA\textsuperscript{+} }
 
@@ -76,7 +79,7 @@
 \date{2022}
 \setlength{\parindent}{2em}
 
-\setlength{\textwidth}{483.69pt}
+\setlength{\textwidth}{455.24pt}
 \begin{document}
 \makeatletter
 \chardef\%=`\%
