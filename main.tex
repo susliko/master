@@ -9,6 +9,8 @@
 \let\cdash=\rcdash
 \usepackage{geometry}
 \usepackage{graphicx}
+\graphicspath{ {./images/} }
+\usepackage{subcaption}
 \usepackage{tempora}
 \usepackage[nottoc,notlot,notlof,numbib]{tocbibind}
 \usepackage{natbib}
@@ -34,31 +36,24 @@
 \definecolor{codepurple}{rgb}{0.58,0,0.82}
 \definecolor{backcolour}{rgb}{0.98,0.98,0.98}
 
-\lstdefinestyle{mystyle}{
-    frame=single,
-    aboveskip=5mm,
-    belowskip=5mm,
-    backgroundcolor=\color{backcolour},   
-    language=scala,
-    commentstyle=\color{codegreen},
-    keywordstyle=\color{blue},
-    numberstyle=\small\color{codegray},
-    stringstyle=\color{codepurple},
-    basicstyle=\ttfamily\footnotesize,
-    breakatwhitespace=false,         
-    breaklines=true,                 
-    captionpos=b,                    
-    keepspaces=true,                 
-    numbers=left,                    
-    numbersep=7pt,                  
-    showspaces=false,                
-    showstringspaces=false,
-    showtabs=false,                  
-    tabsize=2,
+\lstdefinestyle{progStyle}{
+  frame=tb,
+  aboveskip=3mm,
+  belowskip=3mm,
+  showstringspaces=false,
+  columns=flexible,
+  basicstyle={\small\ttfamily},
+  numbers=none,
+  numberstyle=\tiny\color{gray},
+  keywordstyle=\color{blue},
+  commentstyle=\color{dkgreen},
+  stringstyle=\color{green},
+  frame=single,
+  breaklines=true,
+  breakatwhitespace=true,
+  tabsize=3,
 }
 
-\lstset{style=mystyle}
-  
 \geometry{
     a4paper,
     left=30mm,
@@ -809,7 +804,16 @@
 
 Другими словами, требуется разработать систему правил проезда перекрестка, при соблюдении которых гарантированно никто не пострадает.
 
-При пересечении перекрестка у машин есть 4 возможных направления движения: поехать прямо, повернуть налево, повернуть направо, развернуться. Для удобства обозначим ответвления дороги как \emph{N, E, S, W}. Сначала смоделируем сам перекресток без каких-либо правил проезда. Интуиция подсказывает, что состояния машины на перекрестке (подъезжает к нему, стоит перед его началом, едет по нему) можно попробовать смоделировать в виде автомата. Для этого воспользуемся нашим шаблоном (итоговая спецификация размещена в Приложении \ref{appendix:crossroads}):
+При пересечении перекрестка у машин есть 4 возможных направления движения: поехать прямо, повернуть налево, повернуть направо, развернуться. Для удобства обозначим ответвления дороги как \emph{N, E, S, W}. 
+
+\begin{figure}[t]
+\centering
+\includegraphics{crossroads}
+\label{fig:crossroads}
+\caption{Возможные направления движения}
+\end{figure}
+
+Сначала смоделируем сам перекресток без каких-либо правил проезда. Интуиция подсказывает, что состояния машины на перекрестке (подъезжает к нему, стоит перед его началом, едет по нему) можно попробовать смоделировать в виде автомата. Для этого воспользуемся нашим шаблоном (итоговая спецификация размещена в Приложении \ref{appendix:crossroads}):
 
 \begin{tla}
 ---- MODULE crossroads ----
@@ -1255,10 +1259,112 @@ Crashing(car1, car2) ==
 
 Хоть эти задачи и решаются стандартным инструментом \tlapl Toolbox, эксперимент выявил, что он значительно уступает в удобстве IDE для языков программирования.
 
+Первая проблема, с которой пришлось столкнуться --- отсутствие какой-либо подсветки синтаксиса для PlusCal, который пишется в многострочных комментариях \tlapl и лежит в основе предложенной методики. 
+
+Вторая --- эргономика использования стандартного инструмента. В нем отсутствует автоматическая трансляция PlusCal кода в \tlapl и работа через диалоговые окна требует значительного количества манипуляций курсором.
+
+В этой главе будут описаны разработки, произведенные для улучшения опыта разработчиков при использовании методики. Сюда вошли описание tree-sitter \cite{treeSitter} грамматики для лучшей подсветки синтаксиса и разработка плагина для редактора Neovim \cite{nvim}
 
 \section{Подсветка синтаксиса}
+Подсветка синтаксиса позволяет акцентировать внимание на одинаковых вещах и помогает отличать разные. Проиллюстрировать пользу подсветки синтаксиса просто на примере. Достаточно попробовать найти ромбы сначала на левом изображении, а затем на правом.
 
-\section{Neovim плагин}
+\begin{figure}[h]
+  \centering
+  \begin{subfigure}{\linewidth}
+    \includegraphics[scale=0.8]{uncolored}\hfill
+    \includegraphics[scale=0.8]{colored}
+  \end{subfigure}
+  \label{fig:highlighting}
+  \caption{Польза подсветки синтаксиса}
+\end{figure}
+
+Перенося аналогию на код, с помощью цвета можно отделять, например, литералы и переменные.
+
+Самый простой способ реализации подсветки синтаксиса --- регулярные выражения, которые ищут ключевые слова и последовательности символов. Такой подход прост в реализации, но предоставляет очень ограниченные возможности. Например, он не позволяет делать раскраску в зависимости от контекста, отличать объявления переменных и параметров от ссылок на них, распознавать содержимое коментариев и т.д. Другим подходом является верхнеуровневое описание граммактики языка с помощью парсер-комбинаторов и генерации парсера по этой грамматке. Такой инструментарий предоставляется проектом tree-sitter \cite{treeSitter}. 
+
+Tree-sitter позволяет описывать грамматику с помощью комбинаторов на JavaScript в декларативном стиле. Набор комбинаторов достаточно общий, чтобы описать любой язык с контекстно-свободной грамматикой, а генерируемый парсер инкрементален, что позволяет запускать его на каждое нажатие клавиши. Это делает инструмент пригодным для подсветки синтаксиса (и не только) в текстовых редакторах.
+
+Для описания грамматик доступны следующие основные комбинаторы:
+\begin{center}
+\begin{tabular}{||c | c||} 
+ \hline
+Комбинатор & Описание \\ 
+ \hline\hline
+regexp & Регулярные выражения \\
+ \hline
+seq(r1, r2) & Последовательность операторов\\ 
+ \hline
+choice(r1, r2) & Альтернатива операторов \\
+ \hline
+repeat(r) & Повторение оператора любое число раз\\
+ \hline
+repeat1(r) & Ненулевое повторение оператора \\
+ \hline
+optional(r) & Опциональный оператор\\ 
+ \hline
+\end{tabular}
+\end{center}
+
+
+На момент начала работы грамматика \tlapl уже существовала, однако в ней не хватало значительной части --- грамматики подъязыка PlusCal. Трудности в ее описании связаны с нахождением границ многострочных комментариев, внутри которых находится PlusCal код, транспилируемый в код \tlapl. Многострочные комментарии могут быть вложенными и имеют много граничных случаев с участием специальных символов \(*, (, )\). 
+
+Задача была решена с помощью детерменированного конечного автомата, изображенного на рисунке \ref{fig:blockComment}. Знак \(\char`^\) означает ``не``, \(\backslash s\) означает все пробельные символы, остальные символы используются по своему обычному значению.
+
+\newpage
+
+\begin{figure}[h]
+  \includegraphics[scale=0.9]{blockComment}
+  \caption{Разбор многострочного комментария}
+  \label{fig:blockComment}
+\end{figure}
+
+После решения задачи о нахождении границ вложенных комментариев дальнейшая реализация грамматики была прямолинейна и велась по официальной ebnf нотации \cite{pcalEbnf}. Были учтены обе разновидности синтаксиса: c-syntax для разработчиков, более знакомых с языком программирования C и p-syntax для разработчико, более знакомых с Python. По завершению работы была дополнена существовавшая грамматика \cite{pcalGrammar}.
+
+Для примера приведем описание одного из правил:
+
+\begin{lstlisting}[label=listing:empty-element-class, caption=Правило tree-sitter грамматики для PlusCal C-syntax алгоритма, captionpos=b, style=progStyle]
+  _pcal_c_algorithm: $ => seq(
+    $.pcal_algorithm_start,
+    field('name', $.identifier),
+    '{',
+    optional($.pcal_var_decls),
+    optional(alias($.pcal_c_definitions, $.pcal_definitions)),
+    repeat(alias($.pcal_c_macro, $.pcal_macro)),
+    repeat(alias($.pcal_c_procedure, $.pcal_procedure)),
+    choice(
+      alias($.pcal_c_algorithm_body, $.pcal_algorithm_body),
+      repeat1(alias($.pcal_c_process, $.pcal_process))
+    ),
+    '}', $._notify_pcal_algorithm_end
+  ),
+\end{lstlisting}
+
+Правила описывает верхнеуровневую структуру PlusCal алгоритма, который должен начинаться с конструкции \lstinline[style=progStyle]{--algorithm} и имени алгоритма, затем должны следовать опциональные обхявления переменных, опциональные определения операторов, макросы, процедуры и тело алгоритма.
+
+Полученная грамматика справляется со вложенными многострочными комментариями:
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[scale=0.44]{nestedPcal}
+  \caption{Вложенные многострочные комментарии \tlapl}
+  \label{fig:nestedPcal}
+\end{figure}
+
+Для наглядности полезно также провести сравнение подсветки, основанной на полученной грамматике (справа), с подсветкой, основанной на регулярных выражениях (слева):
+
+\begin{figure}[h]
+  \centering
+  \begin{subfigure}{\linewidth}
+    \includegraphics[scale=0.8]{uncolored}\hfill
+    \includegraphics[scale=0.8]{colored}
+  \end{subfigure}
+  \label{fig:highlightingComp}
+  \caption{Сравнение подсветок по регулярным выражениям и грамматике}
+\end{figure}
+
+\newpage
+
+\section{Плагин для Neovim}
 
 \chapter{Выводы}
 
