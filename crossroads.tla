@@ -3,19 +3,6 @@ EXTENDS Sequences, Integers, TLC, FiniteSets, Helpers
 CONSTANTS Cars
 
 
-(* comment --algorithm a1
-begin 
-  skip;
-  (* comment --algorithm a2
-    begin
-      skip;
-      (* comment --algorithm a3
-        begin
-          skip;
-        end algorithm *)
-    end algorithm *)
-end algorithm *)
-
 DirsSeq == <<"N", "E", "S", "W">>
 Dirs == Range(DirsSeq)
 
