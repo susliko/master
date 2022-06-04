@@ -796,8 +796,6 @@
 В данной секции рассмотрим применение разработаного метода на нескольких примерах.
 Целью является демонстрация рассуждений и мыслительного процесса спецификации в зависимости от формата исходной постановки задачи.
 
-\subsection{Денежный перевод}
-
 \subsection{Перекресток}
 Рассмотрим пример задачи с высокоуровневой постановкой, которая может исходить, например, от владельцев продукта.
 
@@ -1155,6 +1153,193 @@ Crashing(car1, car2) ==
 Хоть по отдельности такие ситуации могут происходить редко, каждая из них может провоцировать аварийную ситуацию. Поэтому полезно знать о подобных ограничениях при проектировании городских улиц.
 
 \subsection{Запрос цены}
+Последним рассмотренным нами примером будет моделирование процесса запроса цены (анг. RFQ --- request for quotation).
+
+Запрос цены --- бизнес-процесс, при котором компания-инициатор отправляет множеству поставщиков запрос стоимости товара и услуги.  На ответ отводится ограниченное количество времени, после чего выбирается наилучшее предложение среди поступивших.
+
+Пусть задание поступило к нам на проработку в форме BPMN диаграмма. Такой наглядный формат спецификации позволяет быстро трансформировать ее в модель и начать рассмотрение свойств системы.
+
+
+\begin{figure}[h]
+  \includegraphics[scale=0.2]{rfq}
+  \caption{BPMN диаграмма запроса цены}
+  \label{fig:rfq}
+\end{figure}
+
+Поскольку поставщиков может быть много и имеем дело с алгоритмом, можно воспользовать шаблоном для многопроцессного алгоритма. В качестве констант укажем множество поставщиков \prog{suppliers}, максимальную цену, до которой будет осуществляться перебор возможных вариантов, а также специальное значение \prog{NULL}, которое будет означать отсутствие чего либо. 
+
+И инициатора процесса, и каждого поставщика моделируем как самостоятельный процесс. При этом мы не хотим моделировать ситуации, когда система просто останавливается и перестает что либо делать, хотя условия конца не достигнуты. Поэтому процессы идут с префиксом \prog{fair}.
+
+\begin{tla}
+CONSTANTS suppliers, maxPrice, NULL
+\end{tla}
+\begin{tlatex}
+\@x{ {\CONSTANTS} suppliers ,\, maxPrice ,\, NULL}%
+\end{tlatex}
+\begin{ppcal}
+--algorithm rfq
+  variables
+    requests = [s \in suppliers |-> FALSE],
+    proposals = [s \in suppliers |-> NULL],
+    deadline = FALSE;
+    winner = NULL;
+  define
+    Responded == {el \in DOMAIN proposals: proposals[el] /= NULL}
+  end define;
+  
+  fair process supplier \in suppliers
+  begin
+    skip;
+  end process;
+
+  fair process requester = "requester"
+  begin
+    skip;
+  end process;
+end algorithm;
+\end{ppcal}
+\begin{tlatex}
+\@x{ {\p@mmalgorithm} rfq}%
+\@x{\@s{8.2} {\p@variables}}%
+ \@x{\@s{16.4} requests \.{=} [ s \.{\in} suppliers \.{\mapsto} {\FALSE} ]
+ ,\,}%
+\@x{\@s{16.4} proposals \.{=} [ s \.{\in} suppliers \.{\mapsto} NULL ] ,\,}%
+\@x{\@s{16.4} deadline \.{=} {\FALSE} {\p@semicolon}}%
+\@x{\@s{16.4} winner \.{=} NULL {\p@semicolon}}%
+\@x{\@s{8.2} {\p@define}}%
+ \@x{\@s{16.4} Responded \.{\defeq} \{ el \.{\in} {\DOMAIN} proposals \.{:}
+ proposals [ el ] \.{\neq} NULL \}}%
+\@x{\@s{8.2} {\p@end} {\p@define} {\p@semicolon}}%
+\@pvspace{8.0pt}%
+\@x{\@s{8.2} {\p@fair} {\p@process} supplier \.{\in} suppliers}%
+\@x{\@s{8.2} {\p@begin}}%
+\@x{\@s{16.4} {\p@skip} {\p@semicolon}}%
+\@x{\@s{8.2} {\p@end} {\p@process} {\p@semicolon}}%
+\@pvspace{8.0pt}%
+\@x{\@s{8.2} {\p@fair} {\p@process} requester \.{=}\@w{requester}}%
+\@x{\@s{8.2} {\p@begin}}%
+\@x{\@s{16.4} {\p@skip} {\p@semicolon}}%
+\@x{\@s{8.2} {\p@end} {\p@process}\@s{7.23} {\p@semicolon}}%
+\@x{ {\p@end} {\p@algorithm} {\p@semicolon}}%
+\end{tlatex}
+
+Естественным образом нами вводятся следующие переменные:
+\begin{itemize}
+  \item \prog{requests}: набор запросов к поставщикам.
+  \item \prog{proposals}: набор предложений от поставщиков.
+  \item \prog{deadline}: флаг, говорящий о достижении срока подачи предложений.
+  \item \prog{winner}: победитель запроса цены, изначально отсутствует.
+\end{itemize}
+
+Логика поставщика заключается в том, чтобы после получения запроса на цену отослать свое предложение, если дедлайн еще не наступил:
+
+\begin{ppcal}
+  fair process supplier \in suppliers
+  begin
+  Receive:
+    await requests[self];
+  Respond:
+    with price \in 1..maxPrice \union {NULL} do
+      if ~deadline then
+        proposals[self] := price;
+      end if;
+    end with;
+  end process;
+\end{ppcal}
+\begin{tlatex}
+\@x{\@s{8.2} {\p@fair} {\p@process} supplier \.{\in} suppliers}%
+\@x{\@s{8.2} {\p@begin}}%
+\@x{\@s{8.2} Receive\@s{.5}\textrm{:}\@s{3}}%
+\@x{\@s{16.4} {\p@await} requests [ self ] {\p@semicolon}}%
+\@x{\@s{8.2} Respond\@s{.5}\textrm{:}\@s{3}}%
+ \@x{\@s{16.4} {\p@with} price \.{\in} 1 \.{\dotdot} maxPrice \.{\cup} \{ NULL
+ \} {\p@do}}%
+\@x{\@s{24.59} {\p@if} {\lnot} deadline {\p@then}}%
+\@x{\@s{32.8} proposals [ self ] \.{:=} price {\p@semicolon}}%
+\@x{\@s{24.59} {\p@end} {\p@if}\@s{10.14} {\p@semicolon}}%
+\@x{\@s{16.4} {\p@end} {\p@with} {\p@semicolon}}%
+\@x{\@s{8.2} {\p@end} {\p@process} {\p@semicolon}}%
+\end{tlatex}
+
+Инициатор процесса же сначала отсылает всем по запросу, затем в течении некоторого времени ожидает ответов, и выбирает победителя с самым выгодным предложением, если было прислано хотя бы одно. Примечательно, что значение таймаута здесь не важно, так как не влияет на возможные комбинации:
+
+\begin{ppcal}
+  fair process requester = "requester"
+  begin
+  Request:
+    requests := [s \in suppliers |-> TRUE];
+  Proceed:
+    deadline := TRUE;
+  Decide:                  
+    if Cardinality(Responded) > 0 then
+      winner := 
+        CHOOSE s1 \in Responded: 
+        \A s2 \in Responded: 
+        proposals[s1] <= proposals[s2]
+    end if;
+  end process;
+\end{ppcal}
+\begin{tlatex}
+\@x{\@s{8.2} {\p@fair} {\p@process} requester \.{=}\@w{requester}}%
+\@x{\@s{8.2} {\p@begin}}%
+\@x{\@s{8.2} Request\@s{.5}\textrm{:}\@s{3}}%
+ \@x{\@s{16.4} requests \.{:=} [ s \.{\in} suppliers \.{\mapsto} {\TRUE} ]
+ {\p@semicolon}}%
+\@x{\@s{8.2} Proceed\@s{.5}\textrm{:}\@s{3}}%
+\@x{\@s{16.4} deadline \.{:=} {\TRUE} {\p@semicolon}}%
+\@x{\@s{8.2} Decide\@s{.5}\textrm{:}\@s{3}}%
+\@x{\@s{16.4} {\p@if} Cardinality ( Responded ) \.{>} 0 {\p@then}}%
+\@x{\@s{24.59} winner \.{:=}}%
+\@x{\@s{32.8} {\CHOOSE} s1 \.{\in} Responded \.{:}}%
+\@x{\@s{32.8} \A\, s2 \.{\in} Responded \.{:}}%
+\@x{\@s{32.8} proposals [ s1 ] \.{\leq} proposals [ s2 ]}%
+\@x{\@s{16.4} {\p@end} {\p@if} {\p@semicolon}}%
+\@x{\@s{8.2} {\p@end} {\p@process} {\p@semicolon}}%
+\end{tlatex}
+
+Модель готова, осталось определить требования. Для примера возьмем следующие:
+
+\begin{itemize}
+  \item В какой-то момент безвозвратно наступает дедлайн:
+  \begin{tla}
+    ReachableDeadline == <>[]deadline
+  \end{tla}
+\begin{tlatex}
+\@x{\@s{16.4} ReachableDeadline \.{\defeq} {\Diamond} {\Box} deadline}%
+\end{tlatex}
+  \item После дедлайна предложения не принимаются:
+  \begin{tla}
+    NoProposalsAfterDeadline == 
+        [][deadline => UNCHANGED proposals]_<<deadline, proposals>>
+  \end{tla}
+\begin{tlatex}
+\@x{\@s{16.4} NoProposalsAfterDeadline \.{\defeq}}%
+ \@x{\@s{32.8} {\Box} [ deadline \.{\implies} {\UNCHANGED} proposals ]_{
+ {\langle} deadline ,\, proposals {\rangle}}}%
+\end{tlatex}
+\item Если прислано хотя бы одно предложение, обязательно выбран победитель:
+  \begin{tla}
+    WinnerExists == <>[]((Cardinality(Responded) > 0) => winner /= NULL)
+  \end{tla}
+\begin{tlatex}
+ \@x{\@s{16.4} WinnerExists \.{\defeq} {\Diamond} {\Box} ( ( Cardinality (
+ Responded ) \.{>} 0 ) \.{\implies} winner \.{\neq} NULL )}%
+\end{tlatex}
+  \item Если победитель выбран, он предложил лучшую цену:
+  \begin{tla}
+    WinnerHasBestPrice == 
+        [](winner /= NULL => \A s \in (Responded):
+        proposals[winner] <= proposals[s])
+  \end{tla}
+\begin{tlatex}
+\@x{\@s{16.4} WinnerHasBestPrice \.{\defeq}}%
+ \@x{\@s{32.8} {\Box} ( winner \.{\neq} NULL \.{\implies} \A\, s \.{\in} (
+ Responded ) \.{:}}%
+\@x{\@s{32.8} proposals [ winner ] \.{\leq} proposals [ s ] )}%
+\end{tlatex}
+\end{itemize}
+
+Запуск проверщика подтверждает выполнение всех свойств. Формальная спецификация данного примера хоть и не открыла никаких противоречий в модели, однако побудила осмысление свойств процесса, на поддержание которых стоит обратить внимание при его реализации.
 
 \section{Анализ применимости}
 Этот раздел завершает рассказ о методике, приводя рассуждения о накладных расходах ее применения, ее достоинствах и ограничениях.
@@ -1681,7 +1866,122 @@ end algorithm;
 \@x{ {\p@end} {\p@algorithm} {\p@semicolon}}%
 \end{tlatex}
 
-\section*{Приложение B. }
+\section*{Приложение B. \tlapl примера Запрос цены}
+\addcontentsline{toc}{subsection}{Приложение B. \tlapl примера Запрос цены}
+
+\begin{tla}
+---- MODULE rfq ----
+EXTENDS FiniteSets, Sequences, TLC, Integers
+CONSTANTS suppliers, maxPrice, NULL
+\end{tla}
+\begin{tlatex}
+\@x{}\moduleLeftDash\@xx{ {\MODULE} rfq}\moduleRightDash\@xx{}%
+\@x{ {\EXTENDS} FiniteSets ,\, Sequences ,\, TLC ,\, Integers}%
+\@x{ {\CONSTANTS} suppliers ,\, maxPrice ,\, NULL}%
+\end{tlatex}
+\begin{ppcal}
+--algorithm rfq
+  variables
+    requests = [s \in suppliers |-> FALSE],
+    proposals = [s \in suppliers |-> NULL],
+    deadline = FALSE;
+    winner = NULL;
+  define
+    Responded == {el \in DOMAIN proposals: proposals[el] /= NULL}
+
+    ReachableDeadline == <>[]deadline
+    NoProposalsAfterDeadline == 
+      [][deadline => UNCHANGED proposals]_<<deadline, proposals>>
+    WinnerExists == 
+      <>[]((Cardinality(Responded) > 0) => winner /= NULL)
+    WinnerHasBestPrice == 
+      [](winner /= NULL => \A s \in Responded: 
+         proposals[winner] <= proposals[s])
+  end define;
+  
+  fair process supplier \in suppliers
+  begin
+  Receive:
+    await requests[self];
+  Respond:
+    with price \in 1..maxPrice \union {NULL} do
+      if ~deadline then
+        proposals[self] := price;
+      end if;
+    end with;
+  end process;
+
+  fair process requester = "requester"
+  begin
+  Request:
+    requests := [s \in suppliers |-> TRUE];
+  Proceed:
+    deadline := TRUE;
+  Decide:                  
+    if Cardinality(Responded) > 0 then
+      winner := 
+        CHOOSE s1 \in Responded: 
+        \A s2 \in Responded: 
+        proposals[s1] <= proposals[s2]
+    end if;
+  end process;
+end algorithm;
+\end{ppcal}
+\begin{tlatex}
+\@x{ {\p@mmalgorithm} rfq}%
+\@x{\@s{8.2} {\p@variables}}%
+ \@x{\@s{16.4} requests \.{=} [ s \.{\in} suppliers \.{\mapsto} {\FALSE} ]
+ ,\,}%
+\@x{\@s{16.4} proposals \.{=} [ s \.{\in} suppliers \.{\mapsto} NULL ] ,\,}%
+\@x{\@s{16.4} deadline \.{=} {\FALSE} {\p@semicolon}}%
+\@x{\@s{16.4} winner \.{=} NULL {\p@semicolon}}%
+\@x{\@s{8.2} {\p@define}}%
+ \@x{\@s{16.4} Responded \.{\defeq} \{ el \.{\in} {\DOMAIN} proposals \.{:}
+ proposals [ el ] \.{\neq} NULL \}}%
+\@pvspace{8.0pt}%
+\@x{\@s{16.4} ReachableDeadline \.{\defeq} {\Diamond} {\Box} deadline}%
+\@x{\@s{16.4} NoProposalsAfterDeadline \.{\defeq}}%
+ \@x{\@s{24.59} {\Box} [ deadline \.{\implies} {\UNCHANGED} proposals ]_{
+ {\langle} deadline ,\, proposals {\rangle}}}%
+\@x{\@s{16.4} WinnerExists \.{\defeq}}%
+ \@x{\@s{24.59} {\Diamond} {\Box} ( ( Cardinality ( Responded ) \.{>} 0 )
+ \.{\implies} winner \.{\neq} NULL )}%
+\@x{\@s{16.4} WinnerHasBestPrice \.{\defeq}}%
+ \@x{\@s{24.59} {\Box} ( winner \.{\neq} NULL \.{\implies} \A\, s \.{\in}
+ Responded \.{:}}%
+\@x{\@s{40.84} proposals [ winner ] \.{\leq} proposals [ s ] )}%
+\@x{\@s{8.2} {\p@end} {\p@define} {\p@semicolon}}%
+\@pvspace{8.0pt}%
+\@x{\@s{8.2} {\p@fair} {\p@process} supplier \.{\in} suppliers}%
+\@x{\@s{8.2} {\p@begin}}%
+\@x{\@s{8.2} Receive\@s{.5}\textrm{:}\@s{3}}%
+\@x{\@s{16.4} {\p@await} requests [ self ] {\p@semicolon}}%
+\@x{\@s{8.2} Respond\@s{.5}\textrm{:}\@s{3}}%
+ \@x{\@s{16.4} {\p@with} price \.{\in} 1 \.{\dotdot} maxPrice \.{\cup} \{ NULL
+ \} {\p@do}}%
+\@x{\@s{24.59} {\p@if} {\lnot} deadline {\p@then}}%
+\@x{\@s{32.8} proposals [ self ] \.{:=} price {\p@semicolon}}%
+\@x{\@s{24.59} {\p@end} {\p@if}\@s{10.14} {\p@semicolon}}%
+\@x{\@s{16.4} {\p@end} {\p@with} {\p@semicolon}}%
+\@x{\@s{8.2} {\p@end} {\p@process} {\p@semicolon}}%
+\@pvspace{8.0pt}%
+\@x{\@s{8.2} {\p@fair} {\p@process} requester \.{=}\@w{requester}}%
+\@x{\@s{8.2} {\p@begin}}%
+\@x{\@s{8.2} Request\@s{.5}\textrm{:}\@s{3}}%
+ \@x{\@s{16.4} requests \.{:=} [ s \.{\in} suppliers \.{\mapsto} {\TRUE} ]
+ {\p@semicolon}}%
+\@x{\@s{8.2} Proceed\@s{.5}\textrm{:}\@s{3}}%
+\@x{\@s{16.4} deadline \.{:=} {\TRUE} {\p@semicolon}}%
+\@x{\@s{8.2} Decide\@s{.5}\textrm{:}\@s{3}}%
+\@x{\@s{16.4} {\p@if} Cardinality ( Responded ) \.{>} 0 {\p@then}}%
+\@x{\@s{24.59} winner \.{:=}}%
+\@x{\@s{32.8} {\CHOOSE} s1 \.{\in} Responded \.{:}}%
+\@x{\@s{32.8} \A\, s2 \.{\in} Responded \.{:}}%
+\@x{\@s{32.8} proposals [ s1 ] \.{\leq} proposals [ s2 ]}%
+\@x{\@s{16.4} {\p@end} {\p@if} {\p@semicolon}}%
+\@x{\@s{8.2} {\p@end} {\p@process}\@s{7.23} {\p@semicolon}}%
+\@x{ {\p@end} {\p@algorithm} {\p@semicolon}}%
+\end{tlatex}
 
 \end{document}
 

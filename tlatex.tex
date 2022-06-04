@@ -10,6 +10,8 @@
 \let\cdash=\rcdash
 \usepackage{geometry}
 \usepackage{graphicx}
+\graphicspath{ {./images/} }
+\usepackage{subcaption}
 \usepackage{tempora}
 \usepackage[nottoc,notlot,notlof,numbib]{tocbibind}
 \usepackage{natbib}
@@ -35,31 +37,24 @@
 \definecolor{codepurple}{rgb}{0.58,0,0.82}
 \definecolor{backcolour}{rgb}{0.98,0.98,0.98}
 
-\lstdefinestyle{mystyle}{
-    frame=single,
-    aboveskip=5mm,
-    belowskip=5mm,
-    backgroundcolor=\color{backcolour},   
-    language=scala,
-    commentstyle=\color{codegreen},
-    keywordstyle=\color{blue},
-    numberstyle=\small\color{codegray},
-    stringstyle=\color{codepurple},
-    basicstyle=\ttfamily\footnotesize,
-    breakatwhitespace=false,         
-    breaklines=true,                 
-    captionpos=b,                    
-    keepspaces=true,                 
-    numbers=left,                    
-    numbersep=7pt,                  
-    showspaces=false,                
-    showstringspaces=false,
-    showtabs=false,                  
-    tabsize=2,
+\lstdefinestyle{progStyle}{
+  frame=tb,
+  aboveskip=3mm,
+  belowskip=3mm,
+  showstringspaces=false,
+  columns=flexible,
+  basicstyle={\small\ttfamily},
+  numbers=none,
+  numberstyle=\tiny\color{gray},
+  keywordstyle=\color{blue},
+  commentstyle=\color{dkgreen},
+  stringstyle=\color{green},
+  frame=single,
+  breaklines=true,
+  breakatwhitespace=true,
+  tabsize=3,
 }
 
-\lstset{style=mystyle}
-  
 \geometry{
     a4paper,
     left=30mm,
@@ -73,6 +68,7 @@
 \renewcommand{\theappendix}{\Alph{appendix}}
 
 \newcommand{\tlapl}{TLA\textsuperscript{+} }
+\newcommand{\prog}[1]{\lstinline[style=progStyle]{#1}}
 
 \title{Применение формальных методов при спецификации бизнес-процессов}
 \author{Морковкин Василий}
@@ -83,63 +79,56 @@
 \begin{document}
 \makeatletter
 \chardef\%=`\%
-\fl{ {\p@mmalgorithm} crossroadPass}
+\fl{ {\p@mmalgorithm} rfq}
 \fl{ {\p@variables}}
-\fl{ queue \.{=} [ d \.{\in} Dirs \.{\mapsto} {\langle} {\rangle} ] ,\,}
-\fl{ wantTo \.{=} [ d \.{\in} Dirs \.{\mapsto} \{ \} ] ,\,}
-\fl{ wantFrom \.{=} [ d \.{\in} Dirs \.{\mapsto} \{ \} ] ,\,}
-\fl{ passing \.{=} [ d \.{\in} Dirs \.{\mapsto} \{ \} ] {\p@semicolon}}
+\fl{ requests \.{=} [ s \.{\in} suppliers \.{\mapsto} {\FALSE} ] ,\,}
+\fl{ proposals \.{=} [ s \.{\in} suppliers \.{\mapsto} NULL ] ,\,}
+\fl{ deadline \.{=} {\FALSE} {\p@semicolon}}
+\fl{ winner \.{=} NULL {\p@semicolon}}
 \fl{ {\p@define}}
-\fl{ CanMove ( car ,\, from ,\, to ) \.{\defeq}}
-\fl{ \.{\LET}}
-\fl{ Candidates \.{\defeq} Heads ( queue )}
-\fl{ To ( t ) \.{\defeq} wantTo [ t ] \.{\cap} Candidates}
-\fl{ From ( f ) \.{\defeq} wantFrom [ f ] \.{\cap} Candidates}
-\fl{ Reversing ( d ) \.{\defeq} To ( d ) \.{\cap} From ( d )}
- \fl{ Conflicts ( f ,\, t ) \.{\defeq} ( ( To ( t ) \.{\cap} From ( RightTo [
- f ] ) ) \.{\,\backslash\,} Reversing ( t ) ) \.{\cup} passing [ t ]}
- \fl{ Reversal ( f ,\, t ) \.{\defeq} ( f \.{=} t ) \.{\implies} Cardinality (
- To ( t ) ) \.{=} 1%
-\@y{%
-  reversing car itself
-}%
-}
-\fl{ \.{\IN}}
-\fl{ car \.{\in} Candidates \.{\land}}
-\fl{ Cardinality ( Conflicts ( from ,\, to ) ) \.{=} 0 \.{\land}}
-\fl{ Reversal ( from ,\, to )}
+ \fl{ Responded \.{\defeq} \{ el \.{\in} {\DOMAIN} proposals \.{:} proposals [
+ el ] \.{\neq} NULL \}}
+\fl{}
+\fl{ ReachableDeadline \.{\defeq} {\Diamond} {\Box} deadline}
+\fl{ NoProposalsAfterDeadline \.{\defeq}}
+ \fl{ {\Box} [ deadline \.{\implies} {\UNCHANGED} proposals ]_{ {\langle}
+ deadline ,\, proposals {\rangle}}}
+\fl{ WinnerExists \.{\defeq}}
+ \fl{ {\Diamond} {\Box} ( ( Cardinality ( Responded ) \.{>} 0 ) \.{\implies}
+ winner \.{\neq} NULL )}
+\fl{ WinnerHasBestPrice \.{\defeq}}
+ \fl{ {\Box} (}\al{15}{2}{ winner \.{\neq} NULL \.{\implies} \A\, s \.{\in}
+ Responded \.{:}}
+\fl{ proposals [ winner ] \.{\leq} proposals [ s ] )}
 \fl{ {\p@end} {\p@define} {\p@semicolon}}
 \fl{}
-\fl{ {\p@fair} {\p@process} car \.{\in} Cars}
-\fl{ {\p@variables}}
- \fl{ from \.{\in} Dirs ,\, to \.{\in} Dirs ,\, state \.{=}\@w{Initial}
- {\p@semicolon}}
+\fl{ {\p@fair} {\p@process} supplier \.{\in} suppliers}
 \fl{ {\p@begin}}
-\fl{ Action\@s{.5}\textrm{:}\@s{3}}
-\fl{ {\p@either}}
-\fl{ {\p@await} state \.{=}\@w{Initial} {\p@semicolon}}
-\fl{ state \.{:=}\@w{Waiting} {\p@semicolon}}
-\fl{ queue [ from ] \.{:=} Append ( queue [ from ] ,\, self ) {\p@semicolon}}
-\fl{ wantTo [ to ] \.{:=} wantTo [ to ] \.{\cup} \{ self \} {\p@semicolon}}
- \fl{ wantFrom [ from ] \.{:=} wantFrom [ from ] \.{\cup} \{ self \}
- {\p@semicolon}}
-\fl{ {\p@or}}
-\fl{ {\p@await} state \.{=}\@w{Waiting} {\p@semicolon}}
-\fl{ {\p@await} CanMove ( self ,\, from ,\, to ) {\p@semicolon}}
-\fl{ state \.{:=}\@w{Passing} {\p@semicolon}}
-\fl{ passing [ to ] \.{:=} passing [ to ] \.{\cup} \{ self \} {\p@semicolon}}
-\fl{ {\p@or}}
-\fl{ {\p@await} state \.{=}\@w{Passing} {\p@semicolon}}
-\fl{ state \.{:=}\@w{Initial} {\p@semicolon}}
-\fl{ queue [ from ] \.{:=} Tail ( queue [ from ] ) {\p@semicolon}}
- \fl{ wantTo [ to ] \.{:=} wantTo [ to ] \.{\,\backslash\,} \{ self \}
- {\p@semicolon}}
- \fl{ wantFrom [ from ] \.{:=} wantFrom [ from ] \.{\,\backslash\,} \{ self \}
- {\p@semicolon}}
- \fl{ passing [ to ] \.{:=} passing [ to ] \.{\,\backslash\,} \{ self \}
- {\p@semicolon}}
-\fl{ {\p@end} {\p@either} {\p@semicolon}}
-\fl{ {\p@goto} Action {\p@semicolon}}
+\fl{ Receive\@s{.5}\textrm{:}\@s{3}}
+\fl{ {\p@await} requests [ self ] {\p@semicolon}}
+\fl{ Respond\@s{.5}\textrm{:}\@s{3}}
+ \fl{ {\p@with} price \.{\in} 1 \.{\dotdot} maxPrice \.{\cup} \{ NULL \}
+ {\p@do}}
+\fl{ {\p@if} {\lnot} deadline {\p@then}}
+\fl{ proposals [ self ] \.{:=} price {\p@semicolon}}
+\fl{ {\p@end} {\p@if}}\al{27}{2}{ {\p@semicolon}}
+\fl{ {\p@end} {\p@with}}\al{28}{2}{ {\p@semicolon}}
 \fl{ {\p@end} {\p@process} {\p@semicolon}}
-\fl{ {\p@end} {\p@algorithm} {\p@semicolon}}
+\fl{}
+\fl{ {\p@fair} {\p@process} requester \.{=}\@w{requester}}
+\fl{ {\p@begin}}
+\fl{ Request\@s{.5}\textrm{:}\@s{3}}
+ \fl{ requests \.{:=} [ s \.{\in} suppliers \.{\mapsto} {\TRUE} ]
+ {\p@semicolon}}
+\fl{ Proceed\@s{.5}\textrm{:}\@s{3}}
+\fl{ deadline \.{:=} {\TRUE} {\p@semicolon}}
+\fl{ Decide\@s{.5}\textrm{:}\@s{3}}
+\fl{ {\p@if} Cardinality ( Responded ) \.{>} 0 {\p@then}}
+\fl{ winner \.{:=}}
+\fl{ {\CHOOSE} s1 \.{\in} Responded \.{:}}
+\fl{ \A\, s2 \.{\in} Responded \.{:}}
+\fl{ proposals [ s1 ] \.{\leq} proposals [ s2 ]}
+\fl{ {\p@end} {\p@if} {\p@semicolon}}
+\fl{ {\p@end} {\p@process}}\al{44}{2}{ {\p@semicolon}}
+\fl{ {\p@end} {\p@algorithm}}\al{45}{2}{ {\p@semicolon}}
 \end{document}
